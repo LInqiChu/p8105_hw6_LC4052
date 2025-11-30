@@ -41,14 +41,80 @@ baltimore_data =
 ```
 
 ```{r}
+# Fit a logistic regression
 btm_glm = 
   baltimore_data |>
   glm(resolved ~ victim_age + victim_sex + victim_race, 
       data = _, 
-      family = binomial())
+      family = binomial()) |>
+  broom::tidy() 
 
+btm_result = 
+  btm_glm |>
+  mutate(
+    OR = exp(estimate),
+    CI_lower = exp(estimate - 1.96 * std.error),
+    CI_upper = exp(estimate + 1.96 * std.error)
+  ) |>
+  filter(term == "victim_sexMale") |>
+  select(term, OR, CI_lower, CI_upper)
 
+btm_result
 ```
+
+```{r}
+# Run glm for all cities
+city_results = 
+  city_state |>
+  nest(data = -city_state) |>
+  mutate(
+    models = map(data, \(df) glm(resolved ~ victim_age + victim_sex + victim_race, data = df, family = binomial())),
+  tidy_models = map(models, broom::tidy)
+  ) |>
+  select(city_state, tidy_models) |>
+  unnest(tidy_models) |>
+  filter(term == "victim_sexMale") |>
+  mutate(
+    OR = exp(estimate),
+    CI_lower = exp(estimate - 1.96 * std.error),
+    CI_upper = exp(estimate + 1.96 * std.error)
+  ) |>
+  select(city_state, term, OR, CI_lower, CI_upper)
+
+city_results
+```
+```{r}
+# Create a plot
+city_results |>
+  mutate(city_state = fct_reorder(city_state, OR)) |>
+  ggplot(aes(x = OR, y = city_state)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = CI_lower, xmax = CI_upper), height = 0.8) +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "red") +
+  labs(
+    title = "Adjusted Odds Ratios for Solving Homicides: Male vs Female Victims",
+    x = "Odds Ratio (95% CI)",
+    y = NULL
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+```{r}
+city_results |>
+  summarize(
+    cities_below_1 = sum(OR < 1),
+    cities_above_1 = sum(OR > 1),
+    cities_CI_exclude_1 = sum(CI_upper < 1 | CI_lower > 1)
+  )
+```
+The majority of cities show OR<1, showing that homicides with male victims have lower odds of being solved compared to female victims, after adjusting for victim age, sex and race. Cities such as New York and Baton Rouge have particularly low ORs (< 0.25).
+
+Among all the cities, there are 22 cities whose confidence interval do not include 1.0, suggesting statistically significant differences in solving rates between male and female victim homicides.
+
+Only 6 cities show OR > 1, and these typically have confidence intervals that include 1.0, suggesting no strong evidence that male victim homicides are more likely to be solved.
+
+
 
 
 # Problem 2
