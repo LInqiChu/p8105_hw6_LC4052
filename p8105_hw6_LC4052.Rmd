@@ -4,28 +4,51 @@ output: github_document
 date: "2025-11-30"
 ---
 
-```{r setup, include=FALSE}
-
-
-
-
-
+```{r}
+library(tidyverse)
+library(broom)
+library(dplyr)
+library(ggplot2)
+library(knitr)
 ```
 
 
-
-
+# Problem 1
+```{r}
+homicide_data = read_csv("./data/homicide-data.csv")
+```
 
 ```{r}
+# Create a new variable
+city_state = 
+  homicide_data |>
+  mutate(
+    city_state = str_c(city, ", ", state),
+    resolved = as.numeric(disposition == "Closed by arrest")
+    ) |>
+   filter(
+     !city_state %in% c("Tulsa, AL", "Dallas, TX", "Phoenix, AZ", "Kansas City, MO"),
+     victim_race %in% c("White", "Black")
+     ) |>
+  mutate(victim_age = as.numeric(victim_age))
+```
 
+```{r}
+# Filter out Baltimore
+baltimore_data = 
+  city_state |>
+  filter(city_state == "Baltimore, MD")
+```
 
-
-
+```{r}
+btm_glm = 
+  baltimore_data |>
+  glm(resolved ~ victim_age + victim_sex + victim_race, 
+      data = _, 
+      family = binomial())
 
 
 ```
-
-
 
 
 # Problem 2
@@ -60,6 +83,27 @@ prcp
 broom::glance()
 
 broom::tidy() 
+
+
+```
+
+
+
+
+
+# Problem 3
+```{r}
+hm_df = read_csv("./data/birthweight.csv")
+```
+
+```{r}
+
+
+
+
+
+
+
 
 
 ```
