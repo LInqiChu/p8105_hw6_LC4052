@@ -1,0 +1,66 @@
+---
+title: "p8105_hw6_LC4052"
+output: github_document
+date: "2025-11-30"
+---
+
+```{r setup, include=FALSE}
+
+
+
+
+
+```
+
+
+
+
+
+```{r}
+
+
+
+
+
+
+```
+
+
+
+
+# Problem 2
+```{r}
+library(p8105.datasets)
+data("weather_df")
+```
+
+```{r}
+tmax
+
+tmin
+
+
+
+prcp
+
+
+
+
+
+
+
+
+
+
+
+
+```
+
+```{r}
+broom::glance()
+
+broom::tidy() 
+
+
+```
+
