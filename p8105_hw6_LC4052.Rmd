@@ -9,7 +9,7 @@ library(tidyverse)
 library(broom)
 library(dplyr)
 library(ggplot2)
-library(knitr)
+library(modelr)
 ```
 
 
@@ -83,6 +83,7 @@ city_results =
 
 city_results
 ```
+
 ```{r}
 # Create a plot
 city_results |>
@@ -121,45 +122,145 @@ Only 6 cities show OR > 1, and these typically have confidence intervals that in
 ```{r}
 library(p8105.datasets)
 data("weather_df")
+set.seed(1)
 ```
 
 ```{r}
-tmax
+# Bootstrap for 5000 times
+bootstrap_results = 
+  weather_df |>
+  modelr::bootstrap(n = 5000) |>
+  mutate(
+    models = map(strap, \(df) lm(tmax ~ tmin + prcp, data = df)),
+    tidy_results = map(models, broom::tidy),
+    glance_results = map(models, broom::glance)
+  )
 
-tmin
-
-
-
-prcp
-
-
-
-
-
-
-
-
-
-
-
-
+bootstrap_results
 ```
 
 ```{r}
-broom::glance()
+# Extract r_squared
+r_squared = 
+  bootstrap_results |>
+  select(glance_results) |>
+  unnest(glance_results) |>
+  select(r.squared)
+```
 
-broom::tidy() 
+```{r}
+# Extract beta1/beta2
+beta_ratio = 
+  bootstrap_results |>
+  select(tidy_results) |>
+  unnest(tidy_results) |>
+  select(term, estimate) |>
+  pivot_wider(
+    names_from = term, 
+    values_from = estimate) |>
+  unnest(tmin, prcp) |>
+  mutate(beta_ratio = tmin/prcp) |>
+  select(beta_ratio)
 
+bootstrap_estimates = 
+  bind_cols(r_squared, beta_ratio)
+```
+
+```{r}
+# Estimate of r_squared
+r_plot = 
+  bootstrap_estimates |>
+  ggplot(aes(x = r.squared)) +
+  geom_histogram(bins = 50, fill = "steelblue", alpha = 0.7) +
+  labs(
+    title = "Distribution of Bootstrap R² Estimates",
+    x = "R²",
+    y = "Frequency"
+  ) +
+  theme_minimal()
+
+r_plot
+```
+
+```{r}
+# Estimate of beta_ratio
+ratio_plot = 
+  bootstrap_estimates |>
+  ggplot(aes(x = beta_ratio)) +
+  geom_histogram(bins = 50, fill = "steelblue", alpha = 0.7) +
+  labs(
+    title = "Distribution of Bootstrap β̂₁/β̂₂ Estimates",
+    x = "β̂₁/β̂₂ (tmin/prcp)",
+    y = "Frequency"
+  ) +
+  theme_minimal()
+
+ratio_plot
+```
+
+
+```{r}
+# 
+ci_r_squared = 
+  bootstrap_estimates |>
+  summarize(
+    ci_lower = quantile(r.squared, 0.025),
+    ci_upper = quantile(r.squared, 0.975)
+  )
+
+ci_beta_ratio = 
+  bootstrap_estimates |>
+  summarize(
+    ci_lower = quantile(beta_ratio, 0.025, na.rm = TRUE),
+    ci_upper = quantile(beta_ratio, 0.975, na.rm = TRUE)
+  )
+
+
+ci_r_squared
+ci_beta_ratio
+
+
+bootstrap_estimates |>
+  summarize(
+    r_squared_mean = mean(r.squared),
+    r_squared_sd = sd(r.squared),
+    beta_ratio_mean = mean(beta_ratio, na.rm = TRUE),
+    beta_ratio_sd = sd(beta_ratio, na.rm = TRUE)
+  )
 
 ```
 
+
+
+
+
+NOT DONE: Plot the distribution of your estimates, and describe these in words.
 
 
 
 
 # Problem 3
 ```{r}
-hm_df = read_csv("./data/birthweight.csv")
+hm_df = 
+  read_csv("./data/birthweight.csv") |>
+  janitor::clean_names() |>
+  mutate(
+    babysex = factor(babysex, levels = c(1, 2), 
+                     labels = c("Male", "Female")),
+    frace   = factor(frace, levels = c(1,2,3,4,8,9),
+                     labels = c("White","Black","Asian","Puerto Rican","Other","Unknown")),
+    mrace   = factor(mrace, levels = c(1,2,3,4,8),
+                     labels = c("White","Black","Asian","Puerto Rican","Other")),
+    malform = factor(malform, levels = c(0, 1),
+                     labels = c("Absent", "Present"))
+  )
+
+
+summarize(across(everything(), ~sum(is.na(.))))
+
+
+
+
 ```
 
 ```{r}
@@ -171,6 +272,27 @@ hm_df = read_csv("./data/birthweight.csv")
 
 
 
+
+```
+
+```{r}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```
+
+```{r}
 
 ```
 
