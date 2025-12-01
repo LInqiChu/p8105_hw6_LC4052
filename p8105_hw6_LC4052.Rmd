@@ -135,8 +135,6 @@ bootstrap_results =
     tidy_results = map(models, broom::tidy),
     glance_results = map(models, broom::glance)
   )
-
-bootstrap_results
 ```
 
 ```{r}
@@ -159,14 +157,16 @@ beta_ratio =
     names_from = term, 
     values_from = estimate) |>
   unnest(tmin, prcp) |>
+  filter(prcp != 0) |> 
   mutate(beta_ratio = tmin/prcp) |>
   select(beta_ratio)
-
-bootstrap_estimates = 
-  bind_cols(r_squared, beta_ratio)
 ```
 
 ```{r}
+# Combine results
+bootstrap_estimates = 
+  bind_cols(r_squared, beta_ratio)
+
 # Estimate of r_squared
 r_plot = 
   bootstrap_estimates |>
@@ -189,8 +189,8 @@ ratio_plot =
   ggplot(aes(x = beta_ratio)) +
   geom_histogram(bins = 50, fill = "steelblue", alpha = 0.7) +
   labs(
-    title = "Distribution of Bootstrap β̂₁/β̂₂ Estimates",
-    x = "β̂₁/β̂₂ (tmin/prcp)",
+    title = "Distribution of Bootstrap beta1/beta2 Estimates",
+    x = "tmin/prcp",
     y = "Frequency"
   ) +
   theme_minimal()
@@ -198,9 +198,8 @@ ratio_plot =
 ratio_plot
 ```
 
-
 ```{r}
-# 
+# CI
 ci_r_squared = 
   bootstrap_estimates |>
   summarize(
@@ -215,32 +214,19 @@ ci_beta_ratio =
     ci_upper = quantile(beta_ratio, 0.975, na.rm = TRUE)
   )
 
-
 ci_r_squared
 ci_beta_ratio
-
-
-bootstrap_estimates |>
-  summarize(
-    r_squared_mean = mean(r.squared),
-    r_squared_sd = sd(r.squared),
-    beta_ratio_mean = mean(beta_ratio, na.rm = TRUE),
-    beta_ratio_sd = sd(beta_ratio, na.rm = TRUE)
-  )
-
 ```
+The distribution of R_squared estimates is approximately normal and centered around 0.93 and 0.95. All estimates are high (> 0.90), suggesting that tmin and prcp are strong predictors of tmax.
 
-
-
-
-
-NOT DONE: Plot the distribution of your estimates, and describe these in words.
+The distribution of coefficient ratio is heavily left-skewed with a long left tail. This is likely because prcp is close to zero or negative. The 95% confidence interval is very wide due to skewness and extreme values. The median is negative, suggesting an inverse relationship in the ratio.
 
 
 
 
 # Problem 3
 ```{r}
+# Import data
 hm_df = 
   read_csv("./data/birthweight.csv") |>
   janitor::clean_names() |>
@@ -264,7 +250,6 @@ summarize(across(everything(), ~sum(is.na(.))))
 ```
 
 ```{r}
-
 
 
 
