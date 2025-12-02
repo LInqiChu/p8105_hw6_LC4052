@@ -226,7 +226,7 @@ The distribution of coefficient ratio is heavily left-skewed with a long left ta
 
 # Problem 3
 ```{r}
-# Import data
+# Import and clean data
 hm_df = 
   read_csv("./data/birthweight.csv") |>
   janitor::clean_names() |>
@@ -241,43 +241,117 @@ hm_df =
                      labels = c("Absent", "Present"))
   )
 
+missing_value =
+  hm_df |>
+  summarize(across(everything(), ~sum(is.na(.))))
+missing_value
+```
+There is no missing value.
 
-summarize(across(everything(), ~sum(is.na(.))))
+```{r}
+# My_model
+my_model = lm(bwt ~ babysex + bhead + blength + delwt + fincome + gaweeks + malform + momage + smoken + wtgain + ppbmi, 
+               data = hm_df)
+summary(my_model)
+broom::tidy(my_model)
+```
+According to p_values, babysex, bhead, blength, delwt, fincome, gaweeks, momage, smoken, ppbmi are significant factors.
 
-
-
-
+```{r}
+# Adjusted My_model
+my_model = lm(bwt ~ babysex + bhead + blength + delwt + fincome + gaweeks + momage + smoken + ppbmi, 
+               data = hm_df)
+summary(my_model)
+broom::tidy(my_model)
 ```
 
 ```{r}
+hm_df |>
+  add_predictions(my_model) |>
+  add_residuals(my_model) |>
+  ggplot(aes(x = pred, y = resid)) +
+  geom_point(alpha = 0.3) +
+  geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
+  geom_smooth(se = FALSE, color = "blue") +
+  labs(
+    title = "Residuals vs Fitted Values",
+    x = "Fitted Values",
+    y = "Residuals"
+  ) +
+  theme_minimal()
+```
+My proposed model focuses on main effects of potential predictors (babysex, bhead, blength, delwt, fincome, gaweeks, malform, momage, smoken, wtgain, and ppbmi). By analyzing p values, I adjust the model and include only significant predictors.
 
+The residual plot shows scatter around zero and a downward trend from left to right, indicating model improvement for systematic bias and interaction items.
 
-
-
-
-
-
-
+```{r}
+# Comparison models
+model_1 = lm(bwt ~ blength + gaweeks, data = hm_df)
+model_2 = lm(bwt ~ bhead * blength * babysex, data = hm_df)
 ```
 
 ```{r}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# Cross Validation
+cv_df = 
+  crossv_mc(hm_df, 100) |>
+  mutate(
+    train = map(train, as_tibble),
+    test  = map(test, as_tibble)
+  ) |>
+  mutate(
+    my_model_fit = map(train, \(df) lm(bwt ~ babysex + bhead + blength + delwt + fincome + gaweeks + momage + smoken + ppbmi, 
+               data = df)), 
+    model_1_fit  = map(train, \(df) lm(bwt ~ blength + gaweeks, data = df)),
+    model_2_fit  = map(train, \(df) lm(bwt ~ bhead * blength * babysex, data = df))
+  ) |>
+  mutate(
+    rmse_my_model = map2_dbl(my_model_fit, test, \(mod, df) rmse(mod, df)),
+    rmse_model_1  = map2_dbl(model_1_fit, test, \(mod, df) rmse(mod, df)),
+    rmse_model_2  = map2_dbl(model_2_fit, test, \(mod, df) rmse(mod, df))
+  )
 ```
 
 ```{r}
+# Visualization of comparison
+cv_df |>
+  select(starts_with("rmse")) |>
+  pivot_longer(
+    everything(),
+    names_to = "model",
+    values_to = "rmse",
+    names_prefix = "rmse_"
+  ) |>
+  mutate(model = recode(model,
+                        "my_model" = "My Model",
+                        "model_1" = "Model 1",
+                        "model_2" = "Model 2")) |>
+  ggplot(aes(x = model, y = rmse, fill = model)) +
+  geom_violin(alpha = 0.5) +
+  geom_boxplot(width = 0.3, alpha = 0.7) +
+  labs(
+    title = "Model Comparison: Cross-Validation RMSE",
+    x = NULL,
+    y = "RMSE (grams)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 15, hjust = 1))
 
+# Summary statistics
+cv_df |>
+  select(starts_with("rmse")) |>
+  pivot_longer(
+    everything(),
+    names_to = "model",
+    values_to = "rmse",
+    names_prefix = "rmse_"
+  ) |>
+  group_by(model) |>
+  summarize(
+    mean_rmse = mean(rmse),
+    sd_rmse = sd(rmse)
+  ) |>
+  arrange(mean_rmse)
 ```
-
+Based on the violin plot and the summary statistics, the model I put forward achieves the lowest mean RMSE of 277.8 grams and the lowest standard deviation, which shows the highest stability.
+Model 2 outperforms model 1 with lower mean RMSE and lower standard deviation. In contrast, model 1 exhibits a notably wider distribution with numerous outliers in the upper range.
